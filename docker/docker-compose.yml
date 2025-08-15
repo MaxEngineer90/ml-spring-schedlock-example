@@ -1,0 +1,253 @@
+version: '3.8'
+
+services:
+  # Portainer - Docker Management Web UI
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: schedule-portainer
+    restart: always
+    ports:
+      - "9000:9000"     # Portainer Web UI
+      - "8000:8000"     # Portainer Edge Agent (optional)
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker Socket Access
+      - portainer_data:/data                       # Persistente Portainer Daten
+    environment:
+      # Admin User Configuration
+      PORTAINER_ADMIN_USERNAME: admin
+      PORTAINER_ADMIN_PASSWORD: admin123
+    command: [
+      "--admin-password", "$2a$10$N0rU5w8YQaB2M8lG5bJdL.dKcF/zKqHgBNXjKkW8wGgZoQxOyb6W.",  # BCrypt hash for "admin123"
+      "--admin-password-file", "/tmp/portainer_password"
+    ]
+    networks:
+      - schedule-network
+    labels:
+      - "demo.service=management"
+      - "demo.description=Portainer Docker Management UI - http://localhost:9000"
+      - "demo.credentials=admin / admin123"
+
+  # MySQL Database (shared by all containers)
+  mysql:
+    image: mysql:8.0
+    container_name: schedule-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: schedule_demo
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+      interval: 10s
+      start_period: 30s
+    networks:
+      - schedule-network
+    labels:
+      - "demo.service=database"
+      - "demo.description=MySQL Database for ShedLock Demo"
+
+  # MailHog (catches all emails from all containers)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: schedule-mailhog
+    restart: always
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    logging:
+      driver: "none"  # Disable logging to keep output clean
+    networks:
+      - schedule-network
+    labels:
+      - "demo.service=email"
+      - "demo.description=MailHog Email Catcher - Web UI: http://localhost:8025"
+
+  # Spring Boot Container #1
+  demo-schedule-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: demo-schedule:latest
+    container_name: demo-schedule-container-1
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: password
+      
+      # Mail Configuration
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      EMAIL_FROM: container-1@demo-schedule.local
+      EMAIL_TEST_RECIPIENT: test@demo-schedule.local
+      
+      # Container Identification
+      CONTAINER_NAME: container-1
+      CONTAINER_ID: 1
+      
+      # Spring Configuration
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+      
+      # Logging Configuration
+      LOGGING_LEVEL_COM_EXAMPLE_SCHEDULE: DEBUG
+    ports:
+      - "8080:8080"
+    networks:
+      - schedule-network
+    volumes:
+      - container1_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/test/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "demo.service=application"
+      - "demo.container=1"
+      - "demo.description=Spring Boot Container #1 - WITHOUT ShedLock"
+      - "demo.api=http://localhost:8080/api/test/health"
+      - "demo.logs=docker logs demo-schedule-container-1"
+
+  # Spring Boot Container #2
+  demo-schedule-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: demo-schedule:latest
+    container_name: demo-schedule-container-2
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: password
+      
+      # Mail Configuration
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      EMAIL_FROM: container-2@demo-schedule.local
+      EMAIL_TEST_RECIPIENT: test@demo-schedule.local
+      
+      # Container Identification
+      CONTAINER_NAME: container-2
+      CONTAINER_ID: 2
+      
+      # Spring Configuration
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+      
+      # Logging Configuration
+      LOGGING_LEVEL_COM_EXAMPLE_SCHEDULE: DEBUG
+    ports:
+      - "8081:8080"
+    networks:
+      - schedule-network
+    volumes:
+      - container2_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/test/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "demo.service=application"
+      - "demo.container=2"
+      - "demo.description=Spring Boot Container #2 - WITHOUT ShedLock"
+      - "demo.api=http://localhost:8081/api/test/health"
+      - "demo.logs=docker logs demo-schedule-container-2"
+
+  # Spring Boot Container #3
+  demo-schedule-3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: demo-schedule:latest
+    container_name: demo-schedule-container-3
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: password
+      
+      # Mail Configuration
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      EMAIL_FROM: container-3@demo-schedule.local
+      EMAIL_TEST_RECIPIENT: test@demo-schedule.local
+      
+      # Container Identification
+      CONTAINER_NAME: container-3
+      CONTAINER_ID: 3
+      
+      # Spring Configuration
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+      
+      # Logging Configuration
+      LOGGING_LEVEL_COM_EXAMPLE_SCHEDULE: DEBUG
+    ports:
+      - "8082:8080"
+    networks:
+      - schedule-network
+    volumes:
+      - container3_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/test/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "demo.service=application"
+      - "demo.container=3"
+      - "demo.description=Spring Boot Container #3 - WITHOUT ShedLock"
+      - "demo.api=http://localhost:8082/api/test/health"
+      - "demo.logs=docker logs demo-schedule-container-3"
+
+volumes:
+  mysql_data:
+    labels:
+      - "demo.description=MySQL Database persistent storage"
+  container1_logs:
+    labels:
+      - "demo.description=Container 1 application logs"
+  container2_logs:
+    labels:
+      - "demo.description=Container 2 application logs"
+  container3_logs:
+    labels:
+      - "demo.description=Container 3 application logs"
+  portainer_data:
+    labels:
+      - "demo.description=Portainer persistent configuration data"
+
+networks:
+  schedule-network:
+    driver: bridge
+    labels:
+      - "demo.description=Internal network for ShedLock Demo services"

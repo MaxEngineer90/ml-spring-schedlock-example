@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: demo-schedule
+  
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: root
+    password: password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Liquibase handles schema
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+  
+  # Liquibase Configuration
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true
+  
+  # Email Configuration (Gmail example)
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    # MailHog doesn't need authentication
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+        debug: true
+
+# Logging
+logging:
+  level:
+    net.javacrumbs.shedlock: DEBUG
+    com.example.schedule: DEBUG
+    org.springframework.mail: DEBUG
+
+# Custom application properties
+app:
+  scheduling:
+    enabled: true
+  email:
+    from: ${EMAIL_FROM:noreply@example.com}
+    test-recipient: ${EMAIL_TEST_RECIPIENT:test@example.com}

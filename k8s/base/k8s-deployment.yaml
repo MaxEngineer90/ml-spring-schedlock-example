@@ -1,0 +1,158 @@
+version: '3.8'
+
+services:
+  # MySQL Database (shared by all containers)
+  mysql:
+    image: mysql:8.0
+    container_name: schedule-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: schedule_demo
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+    networks:
+      - schedule-network
+
+  # MailHog (catches all emails from all containers)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: schedule-mailhog
+    restart: always
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    logging:
+      driver: "none"  # Disable logging to keep output clean
+    networks:
+      - schedule-network
+
+  # Spring Boot Container #1
+  demo-schedule-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: demo-schedule-container-1
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: password
+      
+      # Mail Configuration
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      EMAIL_FROM: container-1@demo-schedule.local
+      EMAIL_TEST_RECIPIENT: test@demo-schedule.local
+      
+      # Container Identification
+      CONTAINER_NAME: container-1
+      CONTAINER_ID: 1
+      
+      # Spring Configuration
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    networks:
+      - schedule-network
+    volumes:
+      - container1_logs:/app/logs
+
+  # Spring Boot Container #2
+  demo-schedule-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: demo-schedule-container-2
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: password
+      
+      # Mail Configuration
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      EMAIL_FROM: container-2@demo-schedule.local
+      EMAIL_TEST_RECIPIENT: test@demo-schedule.local
+      
+      # Container Identification
+      CONTAINER_NAME: container-2
+      CONTAINER_ID: 2
+      
+      # Spring Configuration
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+    ports:
+      - "8081:8080"
+    networks:
+      - schedule-network
+    volumes:
+      - container2_logs:/app/logs
+
+  # Spring Boot Container #3
+  demo-schedule-3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: demo-schedule-container-3
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    environment:
+      # Database Configuration
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: password
+      
+      # Mail Configuration
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      EMAIL_FROM: container-3@demo-schedule.local
+      EMAIL_TEST_RECIPIENT: test@demo-schedule.local
+      
+      # Container Identification
+      CONTAINER_NAME: container-3
+      CONTAINER_ID: 3
+      
+      # Spring Configuration
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+    ports:
+      - "8082:8080"
+    networks:
+      - schedule-network
+    volumes:
+      - container3_logs:/app/logs
+
+volumes:
+  mysql_data:
+  container1_logs:
+  container2_logs:
+  container3_logs:
+
+networks:
+  schedule-network:
+    driver: bridge

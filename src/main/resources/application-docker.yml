@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: demo-schedule-docker
+  
+  # Database Configuration für Docker Compose
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  
+  # JPA Configuration
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false  # Disable für cleaner logs
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: false
+  
+  # Liquibase Configuration
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    enabled: true
+  
+  # Email Configuration für Docker Compose (MailHog)
+  mail:
+    host: ${MAIL_HOST:mailhog}
+    port: ${MAIL_PORT:1025}
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+        debug: false
+
+# Logging für Docker Container
+logging:
+  level:
+    root: INFO
+    com.example.schedule: INFO
+    net.javacrumbs.shedlock: INFO
+    org.springframework.mail: WARN
+  pattern:
+    console: "%d{ISO8601} [${CONTAINER_NAME:-unknown}] [%thread] %-5level [%logger{36}] - %msg%n"
+  file:
+    name: /app/logs/application.log
+
+# Management endpoints für Docker
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Custom application properties für Docker
+app:
+  scheduling:
+    enabled: true  # Scheduling aktiviert für Demo
+  email:
+    from: ${EMAIL_FROM:noreply@demo-schedule.local}
+    test-recipient: ${EMAIL_TEST_RECIPIENT:test@demo-schedule.local}
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
