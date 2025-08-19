@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # Portainer - Docker Management Web UI
@@ -7,25 +7,19 @@ services:
     container_name: schedule-portainer
     restart: always
     ports:
-      - "9000:9000"     # Portainer Web UI
-      - "8000:8000"     # Portainer Edge Agent (optional)
+      - "9000:9000" # Portainer Web UI
+      - "8000:8000" # Portainer Edge Agent (optional)
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock  # Docker Socket Access
-      - portainer_data:/data                       # Persistente Portainer Daten
-    environment:
-      # Admin User Configuration
-      PORTAINER_ADMIN_USERNAME: admin
-      PORTAINER_ADMIN_PASSWORD: admin123
-    command: [
-      "--admin-password", "$2a$10$N0rU5w8YQaB2M8lG5bJdL.dKcF/zKqHgBNXjKkW8wGgZoQxOyb6W.",  # BCrypt hash for "admin123"
-      "--admin-password-file", "/tmp/portainer_password"
-    ]
+      - /var/run/docker.sock:/var/run/docker.sock # Docker Socket Access
+      - portainer_data:/data # Persistente Portainer Daten
+    # OPTION 1: Einfache Konfiguration ohne Initial Password (Empfohlen)
+    # Beim ersten Start wird Setup-Wizard angezeigt
     networks:
       - schedule-network
     labels:
       - "demo.service=management"
       - "demo.description=Portainer Docker Management UI - http://localhost:9000"
-      - "demo.credentials=admin / admin123"
+      - "demo.credentials=Setup beim ersten Start"
 
   # MySQL Database (shared by all containers)
   mysql:
@@ -51,16 +45,31 @@ services:
       - "demo.service=database"
       - "demo.description=MySQL Database for ShedLock Demo"
 
+  adminer:
+    image: adminer:latest
+    container_name: schedule-adminer
+    restart: always
+    ports:
+      - "8083:8080" 
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - schedule-network
+    labels:
+      - "demo.service=database-admin"
+      - "demo.description=Adminer DB Admin - http://localhost:8083"
+
   # MailHog (catches all emails from all containers)
   mailhog:
     image: mailhog/mailhog:latest
     container_name: schedule-mailhog
     restart: always
     ports:
-      - "1025:1025"  # SMTP port
-      - "8025:8025"  # Web UI port
+      - "1025:1025" # SMTP port
+      - "8025:8025" # Web UI port
     logging:
-      driver: "none"  # Disable logging to keep output clean
+      driver: "none" # Disable logging to keep output clean
     networks:
       - schedule-network
     labels:
@@ -85,23 +94,28 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: password
-      
+
       # Mail Configuration
       MAIL_HOST: mailhog
       MAIL_PORT: 1025
       EMAIL_FROM: container-1@demo-schedule.local
       EMAIL_TEST_RECIPIENT: test@demo-schedule.local
-      
+
       # Container Identification
       CONTAINER_NAME: container-1
       CONTAINER_ID: 1
-      
+
       # Spring Configuration
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8080
-      
+
       # Logging Configuration
       LOGGING_LEVEL_COM_EXAMPLE_SCHEDULE: DEBUG
+      
+      # Timezone Configuration - NEU HINZUFÜGEN
+      TZ: Europe/Berlin
+
+
     ports:
       - "8080:8080"
     networks:
@@ -139,23 +153,25 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: password
-      
+
       # Mail Configuration
       MAIL_HOST: mailhog
       MAIL_PORT: 1025
       EMAIL_FROM: container-2@demo-schedule.local
       EMAIL_TEST_RECIPIENT: test@demo-schedule.local
-      
+
       # Container Identification
       CONTAINER_NAME: container-2
       CONTAINER_ID: 2
-      
+
       # Spring Configuration
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8080
-      
+
       # Logging Configuration
       LOGGING_LEVEL_COM_EXAMPLE_SCHEDULE: DEBUG
+
+      TZ: Europe/Berlin
     ports:
       - "8081:8080"
     networks:
@@ -193,23 +209,25 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/schedule_demo?useSSL=false&allowPublicKeyRetrieval=true
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: password
-      
+
       # Mail Configuration
       MAIL_HOST: mailhog
       MAIL_PORT: 1025
       EMAIL_FROM: container-3@demo-schedule.local
       EMAIL_TEST_RECIPIENT: test@demo-schedule.local
-      
+
       # Container Identification
       CONTAINER_NAME: container-3
       CONTAINER_ID: 3
-      
+
       # Spring Configuration
       SPRING_PROFILES_ACTIVE: docker
       SERVER_PORT: 8080
-      
+
       # Logging Configuration
       LOGGING_LEVEL_COM_EXAMPLE_SCHEDULE: DEBUG
+
+      TZ: Europe/Berlin
     ports:
       - "8082:8080"
     networks:
