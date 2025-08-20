@@ -1,13 +1,9 @@
 package com.example.schedule.demo_schedule.config;
 
-import java.time.Duration;
-import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.core.LockConfiguration;
@@ -18,22 +14,15 @@ import net.javacrumbs.shedlock.support.annotation.NonNull;
 @Slf4j
 public class LoggingLockProviderWrapper implements LockProvider {
 
-    private static final Duration CLEANUP_INTERVAL = Duration.ofMinutes(5);
-    private static final Duration MAX_LOCK_AGE = Duration.ofHours(1);
+    private static final ZoneId BERLIN_ZONE = ZoneId.of("Europe/Berlin");
+    private static final DateTimeFormatter GERMAN_TIME_FORMAT = 
+        DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss");
 
     private final LockProvider delegate;
     private final EnvironmentHelper environmentHelper = new EnvironmentHelper();
-    private final ConcurrentMap<String, Instant> lockStartTimes = new ConcurrentHashMap<>();
-    private final ScheduledExecutorService cleanupExecutor = 
-        Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "shedlock-cleanup");
-            t.setDaemon(true);
-            return t;
-        });
 
     public LoggingLockProviderWrapper(LockProvider delegate) {
         this.delegate = delegate;
-        startCleanupTask();
     }
 
     @Override
@@ -45,56 +34,15 @@ public class LoggingLockProviderWrapper implements LockProvider {
             Optional<SimpleLock> lockOptional = delegate.lock(lockConfiguration);
             
             if (lockOptional.isPresent()) {
-                handleLockAcquisition(lockName);
+                String berlinTime = ZonedDateTime.now(BERLIN_ZONE).format(GERMAN_TIME_FORMAT);
+                log.info("ShedLock ACQUIRED: {} um {} [{}]", lockName, berlinTime, environmentHelper.getContainerInfo());
                 return Optional.of(new LoggingSimpleLock(lockOptional.get(), lockName));
             } else {
-                handleLockFailure(lockName);
                 return Optional.empty();
             }
             
         } catch (Exception e) {
-            handleLockError(lockName, e);
             throw e;
-        }
-    }
-
-    private void handleLockAcquisition(String lockName) {
-        lockStartTimes.put(lockName, Instant.now());
-        log.info("ShedLock ACQUIRED: {} [{}]", lockName, environmentHelper.getContainerInfo());
-    }
-
-    private void handleLockFailure(String lockName) {
-        log.debug("ShedLock FAILED: {} [{}] - already locked by another instance", 
-                lockName, environmentHelper.getContainerInfo());
-    }
-
-    private void handleLockError(String lockName, Exception e) {
-        log.error("ShedLock ERROR: {} [{}] - {}", 
-                lockName, environmentHelper.getContainerInfo(), e.getMessage());
-    }
-
-    private void startCleanupTask() {
-        cleanupExecutor.scheduleWithFixedDelay(
-            this::cleanupOldLockEntries,
-            CLEANUP_INTERVAL.toMinutes(),
-            CLEANUP_INTERVAL.toMinutes(),
-            TimeUnit.MINUTES
-        );
-    }
-
-    private void cleanupOldLockEntries() {
-        try {
-            Instant cutoff = Instant.now().minus(MAX_LOCK_AGE);
-            
-            var removedEntries = lockStartTimes.entrySet().removeIf(entry -> 
-                entry.getValue().isBefore(cutoff)
-            );
-            
-            if (removedEntries) {
-                log.debug("Cleaned up old lock entries");
-            }
-        } catch (Exception e) {
-            log.warn("Failed to cleanup old lock entries: {}", e.getMessage());
         }
     }
 
@@ -112,41 +60,13 @@ public class LoggingLockProviderWrapper implements LockProvider {
         public void unlock() {
             try {
                 delegate.unlock();
-                handleLockRelease();
+                String berlinTime = ZonedDateTime.now(BERLIN_ZONE).format(GERMAN_TIME_FORMAT);
+                log.info("ShedLock RELEASED: {} um {} [{}]", 
+                        lockName, berlinTime, environmentHelper.getContainerInfo());
             } catch (Exception e) {
-                handleUnlockError(e);
                 throw e;
             }
         }
-
-        private void handleLockRelease() {
-            String duration = calculateLockDuration();
-            log.debug("ShedLock RELEASED: {} ({}) [{}]", 
-                    lockName, duration, environmentHelper.getContainerInfo());
-        }
-
-        private void handleUnlockError(Exception e) {
-            log.error("ShedLock RELEASE ERROR: {} [{}] - {}", 
-                    lockName, environmentHelper.getContainerInfo(), e.getMessage());
-        }
-
-        private String calculateLockDuration() {
-            Instant startTime = lockStartTimes.remove(lockName);
-            if (startTime == null) {
-                return "unknown";
-            }
-            
-            Duration duration = Duration.between(startTime, Instant.now());
-            return formatDuration(duration);
-        }
-    }
-
-    private String formatDuration(Duration duration) {
-        long seconds = duration.getSeconds();
-        if (seconds < 60) {
-            return seconds + "s";
-        }
-        return (seconds / 60) + "m " + (seconds % 60) + "s";
     }
 
     private static class EnvironmentHelper {
